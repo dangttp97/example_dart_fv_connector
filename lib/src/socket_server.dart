@@ -9,7 +9,7 @@ class SocketServer {
 
   SocketServer(int port) {
     _printLogIPs();
-    runZoned(() async {
+    runZonedGuarded(() async {
       final server = await HttpServer.bind("0.0.0.0", port);
 
       server.listen((HttpRequest request) async {
@@ -17,12 +17,11 @@ class SocketServer {
             'Connected ws://${request.connectionInfo?.remoteAddress.address}:$port');
         if (WebSocketTransformer.isUpgradeRequest(request)) {
           //Handle path in url
-          await for (HttpRequest request in server) {
-            switch (request.uri.path) {
-              default:
-                WebSocketTransformer.upgrade(request)
-                    .then((socket) => {_listenSocketEvent(socket, "")});
-            }
+          switch (request.uri.path) {
+            default:
+              final socket = await WebSocketTransformer.upgrade(request);
+              _listenSocketEvent(socket, "");
+              break;
           }
         } else {
           request.response
@@ -31,6 +30,9 @@ class SocketServer {
             ..close();
         }
       });
+    }, (e, stackTrace) {
+      print('Error: $e');
+      print('StackTrace: $stackTrace');
     });
   }
 
